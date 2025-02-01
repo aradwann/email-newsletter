@@ -24,3 +24,5 @@ jobs:
       run: cargo clippy -- -D warnings
     - name: Check formatting
       run: cargo fmt -- --check
+    - name: audit
+      run: cargo audit
