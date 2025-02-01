@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "back"
+name = "email-newslatter"
 version = "0.1.0"
