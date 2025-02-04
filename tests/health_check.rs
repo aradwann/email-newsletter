@@ -37,7 +37,7 @@ pub async fn configure_database(
         .await
         .expect("Failed to connect to Postgres.");
 
-    sqlx::query(&*format!(r#"CREATE DATABASE "{}";"#, config.database_name))
+    sqlx::query(&format!(r#"CREATE DATABASE "{}";"#, config.database_name))
         .execute(&connection_pool)
         .await
         .expect("Failed to create database.");
