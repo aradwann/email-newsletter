@@ -14,10 +14,8 @@ env:
   APP_USER_PWD: secret
   APP_DB_NAME: newsletter
 
-
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     services:
@@ -34,7 +32,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
 
     steps:
     - uses: actions/checkout@v4
@@ -65,7 +62,6 @@ jobs:
     - name: Migrate database
       run: |
         SKIP_DOCKER=true ./scripts/init_db.sh
-
 
     - name: Build
       run: cargo build --verbose
