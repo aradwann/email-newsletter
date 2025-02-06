@@ -15,7 +15,14 @@ struct FormData {
 #[post("/subscriptions")]
 pub async fn subscribe(form: Form<FormData>, pool: Data<PgPool>) -> HttpResponse {
     let request_id = Uuid::new_v4();
-    log::info!(
+    let requset_span = tracing::info_span!(
+        "Handling a new subscription request.",
+        %request_id,
+        email = %form.email,
+        name = %form.name
+    );
+    let _request_span_guard = requset_span.enter();
+    tracing::info!(
         "request_id '{}' - Adding '{}' '{}' as a new subscriber.",
         request_id,
         form.email,
@@ -32,14 +39,14 @@ pub async fn subscribe(form: Form<FormData>, pool: Data<PgPool>) -> HttpResponse
     .await
     {
         Ok(_) => {
-            log::info!(
+            tracing::info!(
                 "request_id '{}' - New subscriber details have been saved.",
                 request_id
             );
             HttpResponse::Ok().finish()
         }
         Err(e) => {
-            log::error!(
+            tracing::error!(
                 "request_id '{}' - Failed to execute query: {:?}",
                 request_id,
                 e
