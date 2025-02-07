@@ -5,7 +5,7 @@ use email_newsletter::{configuration::get_configuration, startup::run};
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     // setup tracing/logger subscriber
-    let subscriber = get_subscriber("email_newsletter".into(), "info".into());
+    let subscriber = get_subscriber("email_newsletter".into(), "info".into(), std::io::stdout);
     init_subscriber(subscriber);
 
     // fetch configuration

@@ -1,10 +1,11 @@
+use std::result::Result;
+
 use actix_web::{
     post,
     web::{Data, Form},
     HttpResponse,
 };
 use sqlx::PgPool;
-use tracing::Instrument;
 use uuid::Uuid;
 
 #[derive(serde::Deserialize)]
@@ -14,35 +15,41 @@ struct FormData {
 }
 
 #[post("/subscriptions")]
+#[tracing::instrument(
+    name = "Adding a new subscriber.",
+    skip(form, pool), 
+    fields(email = %form.email, name = %form.name)
+)]
 pub async fn subscribe(form: Form<FormData>, pool: Data<PgPool>) -> HttpResponse {
-    let request_id = Uuid::new_v4();
-    let requset_span = tracing::info_span!(
-        "Handling a new subscription request.",
-        %request_id,
-        email = %form.email,
-        name = %form.name
-    );
-    let _request_span_guard = requset_span.enter();
 
-    let query_span = tracing::info_span!("Storing new subscription in the database.");
-    match sqlx::query!(
-        r#"INSERT INTO subscriptions (id, email, name) VALUES ($1, $2, $3)"#,
-        Uuid::new_v4(),
-        form.email,
-        form.name,
-    )
-    .execute(pool.get_ref())
-    .instrument(query_span)
+    match insert_subscriber(&pool, &form)
     .await
     {
         Ok(_) => HttpResponse::Ok().finish(),
-        Err(e) => {
-            tracing::error!(
-                "request_id '{}' - Failed to execute query: {:?}",
-                request_id,
-                e
-            );
-            HttpResponse::InternalServerError().finish()
-        }
+        Err(_) =>   HttpResponse::InternalServerError().finish()
+        
     }
+}
+
+#[tracing::instrument(
+    name = "Saving new subscriber details in the database",
+    skip(form, pool)
+)]
+pub async fn insert_subscriber(pool: &PgPool, form: &FormData) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        r#"
+    INSERT INTO subscriptions (id, email, name)
+    VALUES ($1, $2, $3)
+            "#,
+        Uuid::new_v4(),
+        form.email,
+        form.name
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to execute query: {:?}", e);
+        e
+    })?;
+    Ok(())
 }
