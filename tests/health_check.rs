@@ -1,8 +1,15 @@
-use email_newsletter::{configuration::get_configuration, startup::run};
+use email_newsletter::{configuration::get_configuration, startup::run, telemetry};
+use once_cell::sync::Lazy;
 use reqwest::Client;
 use sqlx::PgPool;
 use std::net::TcpListener;
 use uuid::Uuid;
+
+// Ensure that the `TRACING` is only initialized once
+static TRACING: Lazy<()> = Lazy::new(|| {
+    let subscriber = telemetry::get_subscriber("test".into(), "debug".into());
+    telemetry::init_subscriber(subscriber);
+});
 
 pub struct TestApp {
     pub address: String,
@@ -12,6 +19,7 @@ pub struct TestApp {
 
 /// spin up an instance of our app and return its address and client for it
 async fn spawn_app() -> TestApp {
+    Lazy::force(&TRACING);
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
     let port = listener.local_addr().unwrap().port();
     let address = format!("http://127.0.0.1:{}", port);
