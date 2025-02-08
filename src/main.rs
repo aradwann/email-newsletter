@@ -12,8 +12,7 @@ async fn main() -> std::io::Result<()> {
     let configuration = get_configuration().expect("Failed to read configuration.");
 
     // connect to Postgres
-    let connection_pool = sqlx::PgPool::connect_lazy(&configuration.database.connection_string())
-        .expect("Failed to connect to Postgres.");
+    let connection_pool = sqlx::PgPool::connect_lazy_with(configuration.database.with_db());
 
     // bind to the address
     let address = format!(

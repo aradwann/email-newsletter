@@ -1,7 +1,7 @@
 use email_newsletter::{configuration::get_configuration, startup::run, telemetry};
 use once_cell::sync::Lazy;
 use reqwest::Client;
-use sqlx::PgPool;
+use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::net::TcpListener;
 use uuid::Uuid;
 
@@ -50,16 +50,15 @@ async fn spawn_app() -> TestApp {
 pub async fn configure_database(
     config: &email_newsletter::configuration::DatabaseSettings,
 ) -> PgPool {
-    let connection_pool = PgPool::connect(&config.connection_string_without_db())
+    let mut connection = PgConnection::connect_with(&config.without_db())
         .await
-        .expect("Failed to connect to Postgres.");
-
-    sqlx::query(&format!(r#"CREATE DATABASE "{}";"#, config.database_name))
-        .execute(&connection_pool)
+        .expect("Failed to connect to Postgres");
+    connection
+        .execute(format!(r#"CREATE DATABASE "{}";"#, config.database_name).as_str())
         .await
         .expect("Failed to create database.");
 
-    let connection_pool = PgPool::connect(&config.connection_string())
+    let connection_pool = PgPool::connect_with(config.with_db())
         .await
         .expect("Failed to connect to Postgres.");
 
