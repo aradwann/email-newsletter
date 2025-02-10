@@ -21,13 +21,9 @@ struct FormData {
     fields(email = %form.email, name = %form.name)
 )]
 pub async fn subscribe(form: Form<FormData>, pool: Data<PgPool>) -> HttpResponse {
-
-    match insert_subscriber(&pool, &form)
-    .await
-    {
+    match insert_subscriber(&pool, &form).await {
         Ok(_) => HttpResponse::Ok().finish(),
-        Err(_) =>   HttpResponse::InternalServerError().finish()
-        
+        Err(_) => HttpResponse::InternalServerError().finish(),
     }
 }
 
