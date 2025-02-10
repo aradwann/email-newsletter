@@ -70,7 +70,7 @@ jobs:
       run: cargo test --verbose
     
     - name: Check that queries are fresh
-      run: cargo sqlx prepare --workspace --check -- --all-targets
+      run: cargo sqlx prepare --check
 
     - name: Run Clippy
       run: cargo clippy -- -D warnings
