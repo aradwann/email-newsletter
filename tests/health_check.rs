@@ -2,7 +2,7 @@ use email_newsletter::{configuration::get_configuration, startup::run, telemetry
 use once_cell::sync::Lazy;
 use reqwest::Client;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
-use std::net::TcpListener;
+use std::{net::TcpListener, vec};
 use uuid::Uuid;
 
 // Ensure that the `TRACING` is only initialized once
@@ -142,6 +142,34 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
             400,
             response.status().as_u16(),
             "The API did not return a 400 when the payload was {}.",
+            error_message
+        );
+    }
+}
+
+#[tokio::test]
+async fn subscribe_returns_a_200_when_fields_are_present_but_empty() {
+    let app = spawn_app().await;
+    let test_cases = vec![
+        ("name=&email=ursula_le_guin%40gmail.com", "name is empty"),
+        ("name=le%20guin&email=", "email is empty"),
+        // ("name=&email=", "name and email are empty"),
+    ];
+
+    for (invalid_body, error_message) in test_cases {
+        let response = app
+            .client
+            .post(format!("{}/subscriptions", &app.address))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(invalid_body)
+            .send()
+            .await
+            .expect("Failed to execute request.");
+
+        assert_eq!(
+            200,
+            response.status().as_u16(),
+            "The API did not return a 200 when the payload was {}.",
             error_message
         );
     }
