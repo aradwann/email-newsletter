@@ -41,8 +41,7 @@ jobs:
         cargo install sqlx-cli \
           --version=${{ env.SQLX_VERSION }} \
           --features ${{ env.SQLX_FEATURES }} \
-          --no-default-features \
-          --locked
+          --no-default-features
 
     - name: Install PostgreSQL Client
       run: sudo apt-get install -y postgresql-client
