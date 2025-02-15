@@ -1,4 +1,4 @@
-name: Rust
+name: Rust CI
 
 on:
   push:
@@ -24,7 +24,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password
-          POSTGRES_DB: newletter
+          POSTGRES_DB: newsletter  
         ports:
           - 5432:5432
         options: >-
@@ -36,47 +36,44 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install sqlx-cli
-      run:
-        cargo install sqlx-cli
-        --version=${{ env.SQLX_VERSION }}
-        --features ${{ env.SQLX_FEATURES }}
-        --no-default-features
-        --locked
-        # The --locked flag can be used to force Cargo to use the packaged Cargo.lock file if it is available.
-        # This may be useful for ensuring reproducible builds, to use the exact same set of dependencies that were available when the package was published.
-        # It may also be useful if a newer version of a dependency is published that no longer builds on your system, or has other problems
+    - name: Cache Dependencies
+      uses: Swatinem/rust-cache@v2
 
-    - name: Create app user in Postgres
+    - name: Install sqlx-cli (if needed)
       run: |
-        sudo apt-get install postgresql-client
+        if ! command -v sqlx &> /dev/null; then
+          cargo install sqlx-cli \
+          --version=${{ env.SQLX_VERSION }} \
+          --features ${{ env.SQLX_FEATURES }} \
+          --no-default-features \
+          --locked
+        fi
 
-        # Create the application user
-        CREATE_QUERY="CREATE USER ${APP_USER} WITH PASSWORD '${APP_USER_PWD}';"
-        PGPASSWORD="password" psql -U "postgres" -h "localhost" -c "${CREATE_QUERY}"
+    - name: Install PostgreSQL Client
+      run: sudo apt-get install -y postgresql-client
 
-        # Grant create db privileges to the app user
-        GRANT_QUERY="ALTER USER ${APP_USER} CREATEDB;"
-        PGPASSWORD="password" psql -U "postgres" -h "localhost" -c "${GRANT_QUERY}"
-
-    - name: Migrate database
+    - name: Set Up Database
       run: |
-        SKIP_DOCKER=true ./scripts/init_db.sh
+        PGPASSWORD="password" psql -U postgres -h localhost -c "CREATE USER ${APP_USER} WITH PASSWORD '${APP_USER_PWD}';"
+        PGPASSWORD="password" psql -U postgres -h localhost -c "ALTER USER ${APP_USER} CREATEDB;"
 
-    - name: Build
-      run: cargo build --verbose
+    - name: Run Migrations
+      run: SKIP_DOCKER=true ./scripts/init_db.sh
 
-    - name: Run tests
-      run: cargo test --verbose
-    
-    - name: Check that queries are fresh
-      run: cargo sqlx prepare --check
+    - name: Check Formatting
+      run: cargo fmt -- --check
 
     - name: Run Clippy
       run: cargo clippy -- -D warnings
 
-    - name: Check formatting
-      run: cargo fmt -- --check
-      
-    - name: cargo-deny
+    - name: Run cargo-deny
       uses: EmbarkStudios/cargo-deny-action@v2
+
+    - name: Build
+      run: cargo build --verbose
+
+    - name: Run Tests
+      run: cargo test --verbose
+
+    - name: Verify SQLx Queries
+      run: cargo sqlx prepare --check
