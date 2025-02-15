@@ -1,4 +1,4 @@
-name: Rust CI
+name: Rust
 
 on:
   push:
@@ -24,7 +24,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password
-          POSTGRES_DB: newsletter  
+          POSTGRES_DB: newsletter
         ports:
           - 5432:5432
         options: >-
@@ -36,48 +36,48 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Cache Dependencies
-      uses: Swatinem/rust-cache@v2
-
-    - name: Install sqlx-cli (if needed)
+    - name: Install sqlx-cli
       run: |
-        if ! command -v sqlx &> /dev/null; then
-          cargo install sqlx-cli \
+        cargo install sqlx-cli \
           --version=${{ env.SQLX_VERSION }} \
           --features ${{ env.SQLX_FEATURES }} \
           --no-default-features \
           --locked
-        fi
+
+    - name: Install PostgreSQL Client
+      run: sudo apt-get install -y postgresql-client
 
     - name: Create app user in Postgres
       run: |
-        sudo apt-get install postgresql-client
-
         # Create the application user
-        CREATE_QUERY="CREATE USER ${APP_USER} WITH PASSWORD '${APP_USER_PWD}';"
-        PGPASSWORD="password" psql -U "postgres" -h "localhost" -c "${CREATE_QUERY}"
+        CREATE_QUERY="CREATE USER $APP_USER WITH PASSWORD '$APP_USER_PWD';"
+        PGPASSWORD="password" psql -U "postgres" -h "localhost" -c "$CREATE_QUERY"
 
-        # Grant create db privileges to the app user
-        GRANT_QUERY="ALTER USER ${APP_USER} CREATEDB;"
-        PGPASSWORD="password" psql -U "postgres" -h "localhost" -c "${GRANT_QUERY}"
-  
-    - name: Run Migrations
+        # Grant create database privileges
+        GRANT_QUERY="ALTER USER $APP_USER CREATEDB;"
+        PGPASSWORD="password" psql -U "postgres" -h "localhost" -c "$GRANT_QUERY"
+
+        # Change schema ownership and grant necessary permissions
+        SCHEMA_QUERY="ALTER SCHEMA public OWNER TO $APP_USER; GRANT ALL ON SCHEMA public TO $APP_USER;"
+        PGPASSWORD="password" psql -U "postgres" -h "localhost" -d "newsletter" -c "$SCHEMA_QUERY"
+
+    - name: Migrate database
       run: SKIP_DOCKER=true ./scripts/init_db.sh
-
-    - name: Check Formatting
-      run: cargo fmt -- --check
-
-    - name: Run Clippy
-      run: cargo clippy -- -D warnings
-
-    - name: Run cargo-deny
-      uses: EmbarkStudios/cargo-deny-action@v2
 
     - name: Build
       run: cargo build --verbose
 
-    - name: Run Tests
+    - name: Run tests
       run: cargo test --verbose
-
-    - name: Verify SQLx Queries
+    
+    - name: Check that queries are fresh
       run: cargo sqlx prepare --check
+
+    - name: Run Clippy
+      run: cargo clippy -- -D warnings
+
+    - name: Check formatting
+      run: cargo fmt -- --check
+
+    - name: Run cargo-deny
+      uses: EmbarkStudios/cargo-deny-action@v2
