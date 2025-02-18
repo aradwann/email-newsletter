@@ -1,4 +1,5 @@
 use email_newsletter::{configuration::get_configuration, startup::run, telemetry};
+use fake::{Fake, Faker};
 use once_cell::sync::Lazy;
 use reqwest::Client;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
@@ -37,7 +38,19 @@ async fn spawn_app() -> TestApp {
     configuration.database.database_name = Uuid::new_v4().to_string();
     let connection_pool = configure_database(&configuration.database).await;
 
-    let server = run(listener, connection_pool.clone()).expect("Failed to bind address");
+    let email_sender = configuration
+        .email_client
+        .sender()
+        .expect("Invalid sender email");
+    let email_client = email_newsletter::email_client::EmailClient::new(
+        configuration.email_client.base_url,
+        email_sender,
+        Faker.fake(),
+        std::time::Duration::from_secs(1),
+    );
+
+    let server: actix_web::dev::Server =
+        run(listener, connection_pool.clone(), email_client).expect("Failed to bind address");
     tokio::spawn(server);
 
     TestApp {
