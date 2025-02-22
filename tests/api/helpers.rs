@@ -5,6 +5,7 @@ use secrecy::SecretString;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::sync::LazyLock;
 use uuid::Uuid;
+use wiremock::MockServer;
 
 // Ensure that the `tracing` stack is only initialised once using `once_cell`
 static TRACING: LazyLock<()> = LazyLock::new(|| {
@@ -22,6 +23,7 @@ static TRACING: LazyLock<()> = LazyLock::new(|| {
 pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,
+    pub email_server: MockServer,
 }
 
 impl TestApp {
@@ -46,6 +48,7 @@ impl TestApp {
 
 pub async fn spawn_app() -> TestApp {
     LazyLock::force(&TRACING);
+    let email_server = MockServer::start().await;
 
     // Randomise configuration to ensure test isolation
     let configuration = {
@@ -54,6 +57,9 @@ pub async fn spawn_app() -> TestApp {
         c.database.database_name = Uuid::new_v4().to_string();
         // Use a random OS port
         c.application.port = 0;
+        // Use the mock server as the email client base URL
+        c.email_client.base_url = email_server.uri();
+
         c
     };
 
@@ -70,6 +76,7 @@ pub async fn spawn_app() -> TestApp {
     TestApp {
         address,
         db_pool: get_connection_pool(&configuration.database),
+        email_server,
     }
 }
 

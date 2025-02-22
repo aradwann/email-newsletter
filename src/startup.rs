@@ -4,7 +4,6 @@ use crate::routes::{health_check, subscribe};
 use actix_web::dev::Server;
 use actix_web::web::Data;
 use actix_web::{App, HttpServer};
-use secrecy::ExposeSecret;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 use std::net::TcpListener;
@@ -26,11 +25,7 @@ impl Application {
         let email_client = EmailClient::new(
             configuration.email_client.base_url,
             sender_email,
-            configuration
-                .email_client
-                .authorization_token
-                .expose_secret()
-                .to_string(),
+            configuration.email_client.authorization_token.clone(),
             timeout,
         );
 
