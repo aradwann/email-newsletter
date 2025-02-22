@@ -20,7 +20,6 @@ static TRACING: LazyLock<()> = LazyLock::new(|| {
 });
 
 pub struct TestApp {
-    pub client: reqwest::Client,
     pub address: String,
     pub db_pool: PgPool,
 }
@@ -31,6 +30,14 @@ impl TestApp {
             .post(format!("{}/subscriptions", &self.address))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .body(body)
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
+
+    pub async fn health_check(&self) -> reqwest::Response {
+        reqwest::Client::new()
+            .get(format!("{}/health-check", &self.address))
             .send()
             .await
             .expect("Failed to execute request.")
@@ -58,10 +65,9 @@ pub async fn spawn_app() -> TestApp {
         .await
         .expect("Failed to build application.");
     let address = format!("http://localhost:{}", application.port());
-    let _ = tokio::spawn(application.run_until_stopped());
+    tokio::spawn(application.run_until_stopped());
 
     TestApp {
-        client: reqwest::Client::new(),
         address,
         db_pool: get_connection_pool(&configuration.database),
     }

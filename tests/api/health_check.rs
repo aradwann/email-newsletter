@@ -2,12 +2,7 @@
 async fn health_check_works() {
     let app = crate::helpers::spawn_app().await;
 
-    let response = app
-        .client
-        .get(format!("{}/health-check", &app.address))
-        .send()
-        .await
-        .expect("Failed to execute request.");
+    let response = app.health_check().await;
 
     let status = response.status();
 

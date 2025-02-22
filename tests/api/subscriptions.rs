@@ -6,14 +6,7 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
 
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
 
-    let response = app
-        .client
-        .post(format!("{}/subscriptions", &app.address))
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .body(body)
-        .send()
-        .await
-        .expect("Failed to execute request.");
+    let response = app.post_subscriptions(body.into()).await;
 
     assert_eq!(200, response.status().as_u16());
 
@@ -36,15 +29,8 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
         ("", "missing both name and email"),
     ];
 
-    for (invalid_body, error_message) in test_cases {
-        let response = app
-            .client
-            .post(format!("{}/subscriptions", &app.address))
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .body(invalid_body)
-            .send()
-            .await
-            .expect("Failed to execute request.");
+    for (body, error_message) in test_cases {
+        let response = app.post_subscriptions(body.into()).await;
 
         assert_eq!(
             400,
@@ -64,15 +50,8 @@ async fn subscribe_returns_a_200_when_fields_are_present_but_empty() {
         // ("name=&email=", "name and email are empty"),
     ];
 
-    for (invalid_body, error_message) in test_cases {
-        let response = app
-            .client
-            .post(format!("{}/subscriptions", &app.address))
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .body(invalid_body)
-            .send()
-            .await
-            .expect("Failed to execute request.");
+    for (body, error_message) in test_cases {
+        let response = app.post_subscriptions(body.into()).await;
 
         assert_eq!(
             400,
