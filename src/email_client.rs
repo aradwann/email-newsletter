@@ -7,14 +7,14 @@ pub struct EmailClient {
     http_client: Client,
     base_url: String,
     sender: SubscriberEmail,
-    auth_token: String,
+    authorization_token: String,
 }
 
 impl EmailClient {
     pub fn new(
         base_url: String,
         sender: SubscriberEmail,
-        auth_token: String,
+        authorization_token: String,
         timeout: std::time::Duration,
     ) -> Self {
         let http_client = Client::builder().timeout(timeout).build().unwrap();
@@ -22,7 +22,7 @@ impl EmailClient {
             http_client,
             base_url,
             sender,
-            auth_token,
+            authorization_token,
         }
     }
     pub async fn send_email(
@@ -43,7 +43,7 @@ impl EmailClient {
         let _ = self
             .http_client
             .post(&url)
-            .header("X-Postmark-Server-Token", &self.auth_token)
+            .header("X-Postmark-Server-Token", &self.authorization_token)
             .json(&request_body)
             .send()
             .await?
