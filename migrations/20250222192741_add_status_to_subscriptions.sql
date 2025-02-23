@@ -1,2 +1,1 @@
-ALTER TABLE subscriptions ADD COLUMN status VARCHAR
-(255) null;
+ALTER TABLE subscriptions ADD COLUMN status TEXT NULL;

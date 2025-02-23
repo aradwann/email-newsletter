@@ -1,4 +1,6 @@
 application:
   host: localhost
+  base_url: 127.0.0.1
+
 database:
   require_ssl: false

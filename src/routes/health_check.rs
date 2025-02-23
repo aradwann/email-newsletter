@@ -1,6 +1,5 @@
-use actix_web::{get, HttpResponse};
+use actix_web::HttpResponse;
 
-#[get("/health-check")]
 pub async fn health_check() -> HttpResponse {
     HttpResponse::Ok().finish()
 }
