@@ -1,6 +1,8 @@
-use email_newsletter::configuration::{get_configuration, DatabaseSettings};
-use email_newsletter::startup::{get_connection_pool, Application};
-use email_newsletter::telemetry::{get_subscriber, init_subscriber};
+use email_newsletter::{
+    configuration::{get_configuration, DatabaseSettings},
+    startup::{get_connection_pool, Application},
+    telemetry::{get_subscriber, init_subscriber},
+};
 use secrecy::SecretString;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::sync::LazyLock;
@@ -19,11 +21,6 @@ static TRACING: LazyLock<()> = LazyLock::new(|| {
         init_subscriber(subscriber);
     };
 });
-/// Confirmation links embedded in the request to the email API.
-pub struct ConfirmationLinks {
-    pub html: reqwest::Url,
-    pub plain_text: reqwest::Url,
-}
 
 pub struct TestApp {
     pub address: String,
@@ -32,10 +29,16 @@ pub struct TestApp {
     pub email_server: MockServer,
 }
 
+/// Confirmation links embedded in the request to the email API.
+pub struct ConfirmationLinks {
+    pub html: reqwest::Url,
+    pub plain_text: reqwest::Url,
+}
+
 impl TestApp {
     pub async fn post_subscriptions(&self, body: String) -> reqwest::Response {
         reqwest::Client::new()
-            .post(format!("{}/subscriptions", &self.address))
+            .post(&format!("{}/subscriptions", &self.address))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .body(body)
             .send()
@@ -43,13 +46,6 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
-    pub async fn health_check(&self) -> reqwest::Response {
-        reqwest::Client::new()
-            .get(format!("{}/health-check", &self.address))
-            .send()
-            .await
-            .expect("Failed to execute request.")
-    }
     /// Extract the confirmation links embedded in the request to the email API.
     pub fn get_confirmation_links(&self, email_request: &wiremock::Request) -> ConfirmationLinks {
         let body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
@@ -77,6 +73,8 @@ impl TestApp {
 
 pub async fn spawn_app() -> TestApp {
     LazyLock::force(&TRACING);
+
+    // Launch a mock server to stand in for Postmark's API
     let email_server = MockServer::start().await;
 
     // Randomise configuration to ensure test isolation
@@ -86,9 +84,8 @@ pub async fn spawn_app() -> TestApp {
         c.database.database_name = Uuid::new_v4().to_string();
         // Use a random OS port
         c.application.port = 0;
-        // Use the mock server as the email client base URL
+        // Use the mock server as email API
         c.email_client.base_url = email_server.uri();
-
         c
     };
 
@@ -100,14 +97,13 @@ pub async fn spawn_app() -> TestApp {
         .await
         .expect("Failed to build application.");
     let application_port = application.port();
-    let address = format!("http://localhost:{}", application_port);
-    tokio::spawn(application.run_until_stopped());
+    let _ = tokio::spawn(application.run_until_stopped());
 
     TestApp {
-        address,
+        address: format!("http://localhost:{}", application_port),
+        port: application_port,
         db_pool: get_connection_pool(&configuration.database),
         email_server,
-        port: application_port,
     }
 }
 
@@ -116,7 +112,7 @@ async fn configure_database(config: &DatabaseSettings) -> PgPool {
     let maintenance_settings = DatabaseSettings {
         database_name: "postgres".to_string(),
         username: "postgres".to_string(),
-        password: SecretString::from("password".to_string()),
+        password: SecretString::new("password".to_string().into()),
         ..config.clone()
     };
     let mut connection = PgConnection::connect_with(&maintenance_settings.connect_options())
