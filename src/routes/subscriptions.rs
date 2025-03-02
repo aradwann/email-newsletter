@@ -2,6 +2,7 @@ use crate::domain::{NewSubscriber, SubscriberEmail, SubscriberName};
 use crate::email_client::EmailClient;
 use crate::startup::ApplicationBaseUrl;
 use actix_web::{HttpResponse, ResponseError, web};
+use anyhow::Context;
 use chrono::Utc;
 use rand::distr::Alphanumeric;
 use rand::{Rng, rng};
@@ -41,18 +42,23 @@ pub async fn subscribe(
     base_url: web::Data<ApplicationBaseUrl>,
 ) -> Result<HttpResponse, SubscribeError> {
     let new_subscriber = form.0.try_into().map_err(SubscribeError::ValidationError)?;
-    let mut transaction = pool.begin().await.map_err(SubscribeError::PoolError)?;
+    let mut transaction = pool
+        .begin()
+        .await
+        .context("Failed to acquire a Postgres connection from the pool")?;
 
     let subscriber_id = insert_subscriber(&mut transaction, &new_subscriber)
         .await
-        .map_err(SubscribeError::InsertSubscriberError)?;
+        .context("Failed to insert new subscriber in the database")?;
     let subscription_token = generate_subscription_token();
-    store_token(&mut transaction, subscriber_id, &subscription_token).await?;
+    store_token(&mut transaction, subscriber_id, &subscription_token)
+        .await
+        .context("Failed to store the confirmation token for a new subscriber")?;
 
     transaction
         .commit()
         .await
-        .map_err(SubscribeError::TransactionCommitError)?;
+        .context("Failed to commit SQL transaction to store a new subscriber")?;
 
     send_confirmation_email(
         &email_client,
@@ -61,7 +67,7 @@ pub async fn subscribe(
         &subscription_token,
     )
     .await
-    .map_err(SubscribeError::SendEmailError)?;
+    .context("Failed to send confirmation email")?;
 
     Ok(HttpResponse::Ok().finish())
 }
@@ -120,10 +126,7 @@ pub async fn insert_subscriber(
         new_subscriber.name.as_ref(),
         Utc::now()
     );
-    transaction.execute(query).await.map_err(|e| {
-        tracing::error!("Failed to execute query: {:?}", e);
-        e
-    })?;
+    transaction.execute(query).await?;
     Ok(subscriber_id)
 }
 
@@ -188,28 +191,15 @@ pub fn error_chain_fmt(
 pub enum SubscribeError {
     #[error("{0}")]
     ValidationError(String),
-    #[error("Failed to acquire a database connection from the pool")]
-    PoolError(#[source] sqlx::Error),
-    #[error("Failed to insert new subscriber in the database")]
-    InsertSubscriberError(#[source] sqlx::Error),
-    #[error("Failed to commit SQL transaction")]
-    TransactionCommitError(#[source] sqlx::Error),
-    #[error("Failed to store subscription token")]
-    StoreTokenError(#[from] StoreTokenError),
-    #[error("Failed to send confirmation email")]
-    SendEmailError(#[from] reqwest::Error),
+    #[error(transparent)]
+    UnexpectedError(#[from] anyhow::Error),
 }
 
 impl ResponseError for SubscribeError {
     fn status_code(&self) -> actix_web::http::StatusCode {
         match self {
             Self::ValidationError(_) => actix_web::http::StatusCode::BAD_REQUEST,
-
-            Self::PoolError(_)
-            | Self::InsertSubscriberError(_)
-            | Self::TransactionCommitError(_)
-            | Self::SendEmailError(_)
-            | Self::StoreTokenError(_) => actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
+            Self::UnexpectedError(_) => actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }
