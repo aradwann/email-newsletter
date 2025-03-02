@@ -1,6 +1,6 @@
 use email_newsletter::{
-    configuration::{get_configuration, DatabaseSettings},
-    startup::{get_connection_pool, Application},
+    configuration::{DatabaseSettings, get_configuration},
+    startup::{Application, get_connection_pool},
     telemetry::{get_subscriber, init_subscriber},
 };
 use secrecy::SecretString;
