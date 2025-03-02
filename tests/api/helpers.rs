@@ -38,7 +38,7 @@ pub struct ConfirmationLinks {
 impl TestApp {
     pub async fn post_subscriptions(&self, body: String) -> reqwest::Response {
         reqwest::Client::new()
-            .post(&format!("{}/subscriptions", &self.address))
+            .post(format!("{}/subscriptions", &self.address))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .body(body)
             .send()
@@ -97,7 +97,7 @@ pub async fn spawn_app() -> TestApp {
         .await
         .expect("Failed to build application.");
     let application_port = application.port();
-    let _ = tokio::spawn(application.run_until_stopped());
+    tokio::spawn(application.run_until_stopped());
 
     TestApp {
         address: format!("http://localhost:{}", application_port),
